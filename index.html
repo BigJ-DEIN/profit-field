@@ -241,7 +241,7 @@ function randNumStr(){
   if(r<0.72){
     const b=(1+Math.random()*8.9).toFixed(Math.floor(Math.random()*4)+2);
     const e=Math.floor(Math.random()*12)-6;
-    return `${b}Ã10${e<0?`â»${Math.abs(e)}`:String(e)}`;
+    return `${b}×10${e<0?'⁻'+Math.abs(e):String(e)}`;
   }
   if(Math.random()<0.5) return (Math.random()).toFixed(Math.floor(Math.random()*5)+2);
   return `${Math.floor(Math.random()*12)+1}/${Math.floor(Math.random()*200)+2}`;
