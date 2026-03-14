@@ -1,1 +1,1301 @@
-test
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Profit Field</title>
+  <style>
+    * { margin:0;padding:0;box-sizing:border-box; }
+    html,body {
+      width:100%;height:100%;background:#fff;
+      /* overflow / touch-action / overscroll: set by JS â mobile only */
+    }
+    canvas { display:block;width:100%;height:100%;cursor:none; }
+    /* safe-area helper â readable via JS */
+    #safe-area-probe { position:fixed;bottom:0;width:1px;height:env(safe-area-inset-bottom,0px);pointer-events:none; }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="safe-area-probe"></div>
+<script>
+'use strict';
+
+const C = document.getElementById('c');
+const g = C.getContext('2d');
+const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth<=768;
+let W, H, cx, cy, DPR=1, SC=1; // SC = visual scale vs MacBook baseline (956px height)
+// ââ Safe area â env(safe-area-inset-bottom) via probe element ââââââââââââ
+// probeì height = env(safe-area-inset-bottom) = í ì¸ëì¼ì´í° + iOS ì£¼ìì°½ í¬í¨
+// CSSë ìë ë°ìíë¯ë¡ ì¤í¬ë¡¤ ë²í¼ bottomì CSSë¡ë§ ì²ë¦¬.
+// JS gauge ê·¸ë¦¬ê¸°ìë§ safeAreaBottom ì¬ì©.
+let safeAreaBottom=0;
+function readSafeArea(){
+  const el=document.getElementById('safe-area-probe');
+  if(el) safeAreaBottom=el.offsetHeight||0;
+}
+// ResizeObserver: ì£¼ìì°½ ëê» ë°ë ë env()ê° ë³ê²½ â probe ëì´ ë³ê²½ â ì¦ì ë°ì
+window.addEventListener('load',()=>{
+  readSafeArea();
+  const probe=document.getElementById('safe-area-probe');
+  if(probe && window.ResizeObserver){
+    new ResizeObserver(()=>{ safeAreaBottom=probe.offsetHeight||0; }).observe(probe);
+  }
+});
+
+function resize(){
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight; // iframe ììì visualViewportë ì£¼ìì°½ ê°ì§ ëª»í¨ â innerHeight ì¬ì©
+  SC = isMobile ? Math.max(W, H) / 956 : Math.min(W, H) / 956;
+  C.width  = Math.round(W * DPR);
+  C.height = Math.round(H * DPR);
+  C.style.width  = W + 'px';
+  C.style.height = H + 'px';
+  cx = W/2; cy = H/2;
+  readSafeArea();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ââ Scroll-down button (mobile only) âââââââââââââââââââââââââââââââââââââ
+if(isMobile){
+  // Keyframe animations: top chevron pulses first, bottom follows with a delay
+  const scrollStyle=document.createElement('style');
+  scrollStyle.textContent=`
+    @keyframes chev1{
+      0%,100%{opacity:0.20;transform:translateY(0px);}
+      25%{opacity:0.90;transform:translateY(3px);}
+      50%{opacity:0.20;transform:translateY(0px);}
+    }
+    @keyframes chev2{
+      0%,15%,100%{opacity:0.10;transform:translateY(0px);}
+      45%{opacity:0.70;transform:translateY(4px);}
+      65%{opacity:0.10;transform:translateY(0px);}
+    }
+    #scroll-btn{
+      position:fixed;
+      right:16px;
+      bottom:calc(22px + env(safe-area-inset-bottom,0px));
+      width:60px;
+      background:none;border:none;padding:8px 4px 6px;
+      cursor:pointer;
+      display:flex;flex-direction:column;align-items:center;gap:0px;
+      -webkit-tap-highlight-color:transparent;
+      z-index:100;touch-action:manipulation;
+      user-select:none;-webkit-user-select:none;
+    }
+    #scroll-btn .s-label{
+      font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+      font-size:8px;letter-spacing:0.18em;
+      font-weight:800;
+      color:rgba(25,25,25,0.55);
+      text-transform:uppercase;
+      margin-bottom:4px;
+    }
+    #scroll-btn .c1{ animation:chev1 2.0s ease-in-out infinite; }
+    #scroll-btn .c2{ animation:chev2 2.0s ease-in-out infinite; }
+  `;
+  document.head.appendChild(scrollStyle);
+
+  const scrollBtn=document.createElement('button');
+  scrollBtn.id='scroll-btn';
+  // Two stacked SVG chevrons â gap ì¤ì´ê³ (height:16), ì  ìê²(stroke-width:2)
+  scrollBtn.innerHTML=`
+    <span class="s-label">scroll</span>
+    <svg class="c1" width="36" height="11" viewBox="0 0 44 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polyline points="3,3 22,17 41,3" stroke="rgba(15,15,15,0.88)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <svg class="c2" width="36" height="11" viewBox="0 0 44 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polyline points="3,3 22,17 41,3" stroke="rgba(15,15,15,0.88)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
+  document.body.appendChild(scrollBtn);
+
+  // ì¤í¬ë¡¤ ë²í¼ í´ë¦­: ê°ë¥í ëª¨ë  ë°©ë²ì¼ë¡ ë¶ëª¨ íì´ì§ ì¤í¬ë¡¤ ìë
+  scrollBtn.addEventListener('click', ()=>{
+    const h = window.innerHeight;
+    // 1) postMessage â Framer ë± ë¶ëª¨ê° ìì í  ê²½ì° ëë¹
+    try{ window.parent.postMessage({type:'scrollDown', amount:h},'*'); }catch(_){}
+    // 2) ì§ì  scrollBy â same-originì¼ ëë§ ëì (cross-originì SecurityError â ë¬´ì)
+    try{ window.parent.scrollBy({top:h,behavior:'smooth'}); }catch(_){}
+    // 3) ìê¸° ìì  ì¤í¬ë¡¤ (standalone íì´ì§ì¼ ë)
+    window.scrollBy({top:h,behavior:'smooth'});
+  });
+}
+
+// ââ ì¤í¬ë¡¤ ì²ë¦¬: ëª¨ë°ì¼ ì°¨ë¨ / ë°ì¤í¬í ì²´ì´ë ââââââââââââââââââââââââââ
+if(isMobile){
+  // ëª¨ë°ì¼: ì¤í¬ë¡¤Â·ì¤Â·rubber-band ìì  ì°¨ë¨
+  document.documentElement.style.overflow='hidden';
+  document.body.style.overflow='hidden';
+  document.body.style.touchAction='none';
+  document.body.style.overscrollBehavior='none';
+  document.querySelector('canvas').style.touchAction='none';
+} else {
+  // ë°ì¤í¬í: overflow:auto + overscroll-behavior:auto ë¡ ë¸ë¼ì°ì  scroll chaining íì±í.
+  // iframe ì½íì¸ (ìºë²ì¤)ê° ë·°í¬í¸ë¥¼ ê½ ì±ì ì¤í¬ë¡¤ íê³ì í­ì ìì¼ë¯ë¡
+  // í  ì´ë²¤í¸ê° ìëì¼ë¡ ë¶ëª¨ Framer íì´ì§ë¡ ì²´ì´ëë¨.
+  document.documentElement.style.overflow='auto';
+  document.body.style.overflow='auto';
+  document.documentElement.style.overscrollBehavior='auto';
+  document.body.style.overscrollBehavior='auto';
+}
+
+let mouseX=-9999, mouseY=-9999;
+let lastMouseX=-9999, lastMouseY=-9999, mouseIdleFrames=0;
+
+// ââ Water ripple system âââââââââââââââââââââââââââââââââââââââââââââââââââ
+const ripples=[];
+const RIPPLE_SPEED=5.5, RIPPLE_MAX_R=360, RIPPLE_WIDTH=45, RIPPLE_FORCE=0.36;
+let lastRipX=-9999, lastRipY=-9999;
+
+// (safeAreaBottom + readSafeArea defined above, before resize())
+
+// ââ Multi-touch tracking ââââââââââââââââââââââââââââââââââââââââââââââââââ
+const touchPoints=new Map(); // identifier â {x,y}
+let _touchClearTimer=null; // used to reset mouseX/Y after last finger lifts
+
+function emitRipple(cx, cy){
+  const dx=cx-lastRipX, dy=cy-lastRipY;
+  if(dx*dx+dy*dy>225){
+    ripples.push({x:cx,y:cy,r:5});
+    lastRipX=cx; lastRipY=cy;
+    if(ripples.length>14) ripples.shift();
+  }
+}
+
+function handleMove(cx, cy){
+  mouseX=cx; mouseY=cy;
+  emitRipple(cx, cy);
+}
+
+window.addEventListener('mousemove', e=>{ handleMove(e.clientX, e.clientY); });
+
+// ââ Touch support â attached to document so iOS Safari always fires âââââââ
+// (Canvas-level listeners can silently fail on iOS; document-level is bulletproof)
+
+// Prevent default touch behavior (scroll / zoom / rubber-band) â mobile only.
+// Exempt buttons & links so synthetic click events still fire (end-screen buttons, scroll btn).
+if(isMobile){
+  document.addEventListener('touchstart', e=>{
+    if(e.target.closest('button,a,[role="button"]')) return;
+    e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchmove', e=>{
+    if(e.target.closest('button,a,[role="button"]')) return;
+    e.preventDefault();
+  }, {passive:false});
+}
+
+// ë°ì¤í¬í: wheel ë¦¬ì¤ëë passiveë§ ë±ë¡ (preventDefault ìì).
+// overflow:auto + overscrollBehavior:auto ë¡ ë¸ë¼ì°ì  ìì²´ scroll chainingì´ ëì.
+// window.parent.scrollBy()ë cross-origin(netlifyâ framer) SecurityErrorë¡ ì¤í¨íë¯ë¡ ì¬ì© ì í¨.
+
+document.addEventListener('touchstart', e=>{
+  Array.from(e.changedTouches).forEach(t=>{
+    touchPoints.set(t.identifier,{x:t.clientX,y:t.clientY});
+    ripples.push({x:t.clientX,y:t.clientY,r:5}); // immediate ripple on tap
+    if(ripples.length>14) ripples.shift();
+  });
+  mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY;
+}, {passive:false});
+
+document.addEventListener('touchmove', e=>{
+  Array.from(e.changedTouches).forEach(t=>{
+    touchPoints.set(t.identifier,{x:t.clientX,y:t.clientY});
+    emitRipple(t.clientX,t.clientY);
+  });
+  mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY;
+}, {passive:false});
+
+document.addEventListener('touchend', e=>{
+  Array.from(e.changedTouches).forEach(t=>touchPoints.delete(t.identifier));
+  if(e.touches.length>0){
+    if(_touchClearTimer){ clearTimeout(_touchClearTimer); _touchClearTimer=null; }
+    mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY;
+  } else {
+    // All fingers lifted â briefly keep position so current rAF frame can
+    // catch a signal, then reset so the 'formed' state disperses naturally.
+    if(_touchClearTimer) clearTimeout(_touchClearTimer);
+    _touchClearTimer=setTimeout(()=>{ mouseX=-9999; mouseY=-9999; _touchClearTimer=null; }, 80);
+  }
+}, {passive:true});
+
+document.addEventListener('touchcancel', e=>{
+  Array.from(e.changedTouches).forEach(t=>touchPoints.delete(t.identifier));
+  if(e.touches.length===0){ if(_touchClearTimer) clearTimeout(_touchClearTimer); mouseX=-9999; mouseY=-9999; }
+}, {passive:true});
+
+let frame=0;
+function dist2(ax,ay,bx,by){ const dx=ax-bx,dy=ay-by; return dx*dx+dy*dy; }
+
+// ââ Content generators ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function randNumStr(){
+  const r=Math.random();
+  if(r<0.25) return String(Math.floor(Math.random()*999999)+10);
+  if(r<0.50){
+    const i=Math.floor(Math.random()*999),d=Math.floor(Math.random()*100000),n=Math.floor(Math.random()*4)+1;
+    return `${i}.${String(d).padStart(n+1,'0').slice(0,n+1)}`;
+  }
+  if(r<0.72){
+    const b=(1+Math.random()*8.9).toFixed(Math.floor(Math.random()*4)+2);
+    const e=Math.floor(Math.random()*12)-6;
+    return `${b}Ã10${e<0?`â»${Math.abs(e)}`:String(e)}`;
+  }
+  if(Math.random()<0.5) return (Math.random()).toFixed(Math.floor(Math.random()*5)+2);
+  return `${Math.floor(Math.random()*12)+1}/${Math.floor(Math.random()*200)+2}`;
+}
+const MATH_EXPRS=['âÂ²Ï/âtÂ²=cÂ²âÂ²Ï','âÂ²Ï=Ï/Îµâ','â®EÂ·dA=Q/Îµâ','â®BÂ·dA=0',
+  'â«ââ^âeâ»Ë£Â²dx=âÏ','lim(1+1/n)â¿=e','âÎµ>0âÎ´>0',
+  'Ä¤Ï=iââÏ/ât','[xÌ,pÌ]=iâ','ÏâÏââ¥â/2','â¨Ï|Ä¤|Ïâ©=E',
+  'e^{iÏ}+1=0','Î¶(s)=â(1âpâ»Ë¢)â»Â¹','Z=â«DÏe^{iS/â}',
+  'KL(PâQ)=âPÂ·ln(P/Q)','â_Î¸L=1/nâââ/âÎ¸',
+  'P(A|B)=P(B|A)P(A)/P(B)','Var(X)=E[XÂ²]âE[X]Â²'];
+const NAMES=['JEE','JAY'];
+function randContent(){
+  const r=Math.random();
+  if(r<0.07) return NAMES[Math.random()*NAMES.length|0];
+  if(r<0.64) return randNumStr();
+  return MATH_EXPRS[Math.random()*MATH_EXPRS.length|0];
+}
+function randChar(){ return randContent().charAt(0)||'â¢'; }
+const COLORS=[[20,20,20],[20,20,20],[20,20,20],[30,50,120],[100,20,20],[20,80,50]];
+
+// ââ 3-D Particle field âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+const FOCAL=520, Z_FAR=1600, Z_NEAR=480;
+
+class Pt {
+  constructor(initial=false){ this.excite=0; this.wavOff=Math.random()*Math.PI*2; this.sx=0; this.sy=0; this.init(initial); }
+  init(initial=false){
+    this.x=(Math.random()-.5)*2200; this.y=(Math.random()-.5)*2200;
+    this.z=initial?Math.random()*Z_FAR:Z_FAR+Math.random()*300;
+    this.vx=(Math.random()-.5)*.35; this.vy=(Math.random()-.5)*.35;
+    this.vz=-(0.6+Math.random()*2.2);
+    this.char=randContent(); this.cd=(30+Math.random()*80)|0;
+    this.nameAlpha=NAMES.includes(this.char)?0.10+Math.random()*0.20:-1;
+    const col=COLORS[Math.random()*COLORS.length|0];
+    this.cr=col[0]; this.cg=col[1]; this.cb=col[2];
+  }
+  update(sigs){
+    const sc=FOCAL/Math.max(1,FOCAL+this.z);
+    const px=cx+this.x*sc, py=cy+this.y*sc;
+
+    // ââ Water ripple displacement ââââââââââââââââââââââââââââââââââââââââââ
+    // Each expanding ring passes through particles and pushes them outward
+    // (sinusoidal profile: leading crest pushes, trailing trough pulls back)
+    for(const rip of ripples){
+      const rdx=px-rip.x, rdy=py-rip.y;
+      const rd=Math.sqrt(rdx*rdx+rdy*rdy);
+      if(rd<1) continue;
+      const diff=rd-rip.r;                    // signed dist from ring centre
+      if(Math.abs(diff)<RIPPLE_WIDTH){
+        // t in [-1,1]: -1 = behind ring, 0 = ring centre, +1 = ahead of ring
+        const t=diff/RIPPLE_WIDTH;
+        // sin profile: positive push at ring, gentle pull behind (water-like)
+        const profile=-Math.sin(t*Math.PI);
+        // Amplitude decays with distance (1/âr like real 2-D waves) + range fade
+        const decay=(1-rip.r/RIPPLE_MAX_R)*Math.min(1,40/Math.sqrt(Math.max(1,rip.r)));
+        const force=RIPPLE_FORCE*profile*decay;
+        this.vx+=(rdx/rd)*force/sc;
+        this.vy+=(rdy/rd)*force/sc;
+      }
+    }
+
+    // Mouse-idle drift: when cursor is still, particles slowly drift back toward it
+    const mdx=px-mouseX, mdy=py-mouseY;
+    const md=Math.sqrt(mdx*mdx+mdy*mdy);
+    if(mouseIdleFrames>45&&mouseX>-100){
+      const idleT=Math.min(1,(mouseIdleFrames-45)/90); // ramps up over ~1.5s
+      if(md>60&&md<420){
+        const attrF=0.00035*idleT/sc;
+        this.vx+=(-mdx/md)*attrF;
+        this.vy+=(-mdy/md)*attrF;
+      }
+    }
+    // Magnetic combo effect: high combo pulls particles toward cursor
+    if(combo>=5&&mouseX>-100&&md>30&&md<350){
+      const magStr=Math.min(combo-4,6)*0.00018/sc;
+      this.vx+=(-mdx/md)*magStr;
+      this.vy+=(-mdy/md)*magStr;
+    }
+    // Signal effects â iterate all active signals
+    let inZone=false;
+    for(const sig of sigs){
+      if(sig.triggered) continue;
+      const sdx=px-sig.x, sdy=py-sig.y;
+      const sdist=Math.sqrt(sdx*sdx+sdy*sdy);
+      const zone=sig.r*3.5;
+      if(sdist<zone){
+        inZone=true;
+        const e=(1-sdist/zone)*sig.intensity;
+        if(e>0.12&&this.cd>2) this.cd=Math.max(1,this.cd-Math.ceil(e*10));
+        switch(sig.type){
+          case 0: this.excite=Math.max(this.excite,e*0.5); break;
+          case 1: this.vx+=(sig.x-px)*0.0012/sc*e; this.vy+=(sig.y-py)*0.0012/sc*e; this.excite=Math.max(this.excite,e*0.55); break;
+          case 2: this.vx+=(Math.random()-.5)*0.08*e/sc; this.vy+=(Math.random()-.5)*0.08*e/sc; this.excite=Math.min(1,this.excite+0.12*e); break;
+          case 3: if(Math.random()<0.14*e){this.char=randContent();this.cd=2;} this.excite=Math.max(this.excite,e*0.4); break;
+          case 4: { const angle=Math.atan2(sdy,sdx); this.vx+=-Math.sin(angle)*0.015*e/sc; this.vy+=Math.cos(angle)*0.015*e/sc; this.vx+=(sig.x-px)*0.0004/sc*e; this.vy+=(sig.y-py)*0.0004/sc*e; } this.excite=Math.max(this.excite,e*0.6); break;
+          case 5: { const pulse=Math.sin(frame*0.045+sdist*0.022)*0.5+0.5; this.vx+=(sig.x-px)*0.0015/sc*e*pulse; this.vy+=(sig.y-py)*0.0015/sc*e*pulse; } this.excite=Math.max(this.excite,e*0.45); break;
+        }
+      }
+    }
+    if(!inZone){ this.excite=Math.max(0,this.excite-0.025); }
+    this.vx*=.972; this.vy*=.972;
+    this.x+=this.vx; this.y+=this.vy; this.z+=this.vz;
+    const flip=Math.max(3,120-sc*90)|0;
+    if(--this.cd<=0){ this.char=randContent(); this.cd=flip; this.nameAlpha=NAMES.includes(this.char)?0.10+Math.random()*0.20:-1; }
+  }
+  get dead(){ return this.z<Z_NEAR; }
+  draw(sigs){
+    const sc=FOCAL/Math.max(1,FOCAL+this.z);
+    let px=cx+this.x*sc, py=cy+this.y*sc;
+    // WAVE displacement + FLASH boost â iterate all active signals
+    let flashBoost=0;
+    for(const sig of sigs){
+      if(sig.triggered) continue;
+      if(sig.type===0){
+        const sdx=px-sig.x,sdy=py-sig.y,sdist=Math.sqrt(sdx*sdx+sdy*sdy);
+        const zone=sig.r*3.2;
+        if(sdist<zone){ const I=(1-sdist/zone)*sig.intensity,amp=12*I,spd=frame*0.068+this.wavOff; px+=Math.sin(spd+sdist*0.05)*amp; py+=Math.cos(spd*0.86+sdist*0.04)*amp*0.65; }
+      }
+      if(sig.type===3){
+        const sdist=Math.sqrt(dist2(px,py,sig.x,sig.y));
+        if(sdist<sig.r*3.0) flashBoost=Math.max(flashBoost,((Math.sin(frame*0.24+sdist*0.03)+1)*0.5)*0.5*(1-sdist/(sig.r*3.0))*sig.intensity);
+      }
+    }
+    // Cache screen position for signal zone mesh drawing
+    this.sx=px; this.sy=py;
+    if(px<-80||px>W+80||py<-80||py>H+80) return;
+    const fs=Math.max(5,sc*28)|0;
+    const t=Math.min(1,Math.pow(sc,1.2)*1.6);
+    const ex=Math.min(1,this.excite+flashBoost);
+    const r=(255-(255-this.cr)*t)|0;
+    const gv=(255-(255-this.cg)*t)|0;
+    const bv=(255-(255-this.cb)*t)|0;
+    const fr=Math.min(255,(r+(200-r)*ex))|0;
+    const fg=Math.max(0,(gv*(1-ex*.78))|0);
+    const fb=Math.max(0,(bv*(1-ex*.88))|0);
+    // ââ Opacity: boost to 0.75 when particles are color-excited ââââââââââ
+    const baseAlpha=Math.min(.5,t*.55);
+    const boostedAlpha=baseAlpha+(0.75-baseAlpha)*Math.min(1,ex*1.8);
+    g.save();
+    const moodF=0.80+mood*0.40; // particles brighter when mood is high
+    g.globalAlpha=this.nameAlpha>=0?this.nameAlpha:Math.min(0.80,boostedAlpha*moodF);
+    g.font=`${fs}px "Courier New",monospace`;
+    g.fillStyle=`rgb(${fr},${fg},${fb})`;
+    g.textAlign='center'; g.textBaseline='middle';
+    g.fillText(this.char,px,py);
+    g.restore();
+  }
+}
+// Mobile gets more particles relative to screen area (small screen â low raw count otherwise)
+const COUNT=isMobile
+  ? Math.min(250, Math.floor(window.innerWidth*window.innerHeight/1800))
+  : Math.min(360, Math.floor(window.innerWidth*window.innerHeight/5200));
+const parts=Array.from({length:COUNT},()=>new Pt(true));
+
+// ââ PROFIT letterforms â pixel-extracted from reference image âââââââââââââ
+// Half size: DOT_PITCH=3px, DOT_R=1.5px
+const DOT_PITCH=3, DOT_R=1.5, VCENTER=11.5, LETTER_GAP=0;
+
+const LETTER_DEFS=[
+  // + â 11wÃ15h + 5 zero cols right-padding for gap, dy=5
+  {dy:5,grid:[
+    '0000110000000000',
+    '0000110000000000',
+    '0000110000000000',
+    '0000110000000000',
+    '1111111111100000',
+    '1111111111100000',
+    '0000110000000000',
+    '0000110000000000',
+    '0000110000000000',
+    '0000110000000000',
+    '0000110000000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+  ]},
+  // p â 13wÃ19h, dy=5 (12 visible + 1 padding for gap to r)
+  {dy:5,grid:['1100111110000','1101111111000','1110000011100','1110000001110','1100000000110','1100000000110','1100000000110','1100000000110','1100000000110','1100000000110','1100000000110','1110000001110','1110000011100','1101111111000','1100111110000','1100000000000','1100000000000','1100000000000','1100000000000']},
+  // r â 9wÃ15h, dy=5
+  {dy:5,grid:['111100111','111101111','001110000','001100000','001100000','001100000','001100000','001100000','001100000','001100000','001100000','001100000','001100000','111111100','111111100']},
+  // o â 12wÃ15h, dy=5
+  {dy:5,grid:['000111111001','001111111101','011100001110','011000000110','110000000011','110000000011','110000000011','110000000011','110000000011','110000000011','110000000011','011000000110','011100001110','001111111100','000111111000']},
+  // f â 10wÃ20h, dy=0
+  {dy:0,grid:['0000111100','0001111100','0011000000','0011000000','0011000000','1111111111','1111111111','0011000000','0011000000','0011000000','0011000000','0011000000','0011000000','0011000000','0011000000','0011000000','0011000000','0011000000','0011000011','0011000011']},
+  // i â 3wÃ20h, dy=0
+  {dy:0,grid:['011','011','011','000','000','011','011','011','011','011','011','011','011','011','011','011','011','011','111','111']},
+  // t â 10wÃ18h, dy=2
+  {dy:2,grid:['0000110000','0000110000','0000110000','0011111111','0011111111','0000110000','0000110000','0000110000','0000110000','0000110000','0000110000','0000110000','0000110000','0000110000','0000110000','0000110000','1110011111','1110001111']},
+];
+
+function buildGlyphOffsets(){
+  let totalCols=0;
+  LETTER_DEFS.forEach((ld,i)=>{ totalCols+=ld.grid[0].length+(i<LETTER_DEFS.length-1?LETTER_GAP:0); });
+  const pts=[];
+  let col0=0;
+  for(const {dy,grid} of LETTER_DEFS){
+    const lw=grid[0].length;
+    for(let row=0;row<grid.length;row++)
+      for(let col=0;col<lw;col++)
+        if(grid[row][col]==='1')
+          pts.push({ox:(col0+col-totalCols/2)*DOT_PITCH, oy:(dy+row-VCENTER)*DOT_PITCH});
+    col0+=lw+LETTER_GAP;
+  }
+  return pts;
+}
+const GLYPH_OFFSETS=buildGlyphOffsets();
+
+// ââ Signal â 6 types, particle-behavior-driven ââââââââââââââââââââââââââââ
+const SIG_TYPES=6;
+class Signal {
+  constructor(){
+    const halfW=(GLYPH_OFFSETS.reduce((m,p)=>Math.max(m,Math.abs(p.ox)),0))+50;
+    this.x=halfW+80+Math.random()*(W-halfW*2-160);
+    // In portrait mobile, keep signals away from the bottom gauge area
+    const _spawnBottom=(isMobile&&H>W)?H-85:H-90;
+    this.y=90+Math.random()*Math.max(0,_spawnBottom-90);
+    this.r=(35+Math.random()*45)*SC; // SC normalises size to MacBook 956px-height baseline
+    this.age=0; this.maxAge=420+Math.floor(Math.random()*280); // each signal has own lifespan
+    this.type=Math.floor(Math.random()*SIG_TYPES);
+    this.triggered=false; this.minAge=35;
+    this.phase=Math.random()*Math.PI*2;
+    // ââ Organic blob shape data ââââââââââââââââââââââââââââââââââââââââââââ
+    const N=8;
+    this.blobN=N;
+    // Evenly spaced base angles with Â±30% jitter, sorted to keep angular order
+    this.blobAngles=Array.from({length:N},(_,i)=>
+      i*Math.PI*2/N+(Math.random()-0.5)*Math.PI*2/N*0.6).sort((a,b)=>a-b);
+    this.blobAmps  =Array.from({length:N},()=>0.18+Math.random()*0.38);
+    this.blobFreqs =Array.from({length:N},()=>0.018+Math.random()*0.028);
+    this.blobPhases=Array.from({length:N},()=>Math.random()*Math.PI*2);
+    // Blob appears with a delay â feels like it's being "detected"
+    this.blobStartAge=60+Math.floor(Math.random()*80);
+    // Signal personality: fake (~20%) â penalty on catch
+    this.hidden=false;
+    this.fake=Math.random()<0.20;
+    // Moving signals: activated once combo â¥ 3, speed scales with streak
+    if(combo>=3){
+      const spd=(0.35+Math.min(combo,8)*0.09)*(isMobile?0.65:1.0), a=Math.random()*Math.PI*2;
+      this.mvx=Math.cos(a)*spd; this.mvy=Math.sin(a)*spd;
+    } else { this.mvx=0; this.mvy=0; }
+  }
+  get intensity(){ return Math.min(1,this.age/40)*Math.min(1,(this.maxAge-this.age)/50); }
+  get canTrigger(){ return this.age>=this.minAge&&!this.triggered; }
+  get hotX(){ return this.x+Math.sin(this.age*0.022+this.phase)*Math.min(26,this.r*0.38); }
+  get hotY(){ return this.y+Math.cos(this.age*0.016+this.phase*0.75)*Math.min(20,this.r*0.30); }
+  // Mobile: base 0.65 â min ~r*0.65 radius (â32px), max ~r*1.0 (â50px) â finger-friendly
+  get hotR(){ const base=isMobile?0.65:0.28, range=isMobile?0.35:0.22; return this.r*(base+range*Math.abs(Math.sin(this.age*0.040+this.phase))); }
+  get atPeak(){ return Math.abs(Math.sin(this.age*0.040+this.phase))>0.82; } // rhythm window
+  containsMouse(){
+    const hr=this.hotR, hx=this.hotX, hy=this.hotY, hr2=hr*hr;
+    if(dist2(mouseX,mouseY,hx,hy)<hr2) return true;
+    for(const tp of touchPoints.values()){
+      if(dist2(tp.x,tp.y,hx,hy)<hr2) return true;
+    }
+    return false;
+  }
+  update(){
+    this.age++;
+    if(this.mvx!==0||this.mvy!==0){
+      this.x+=this.mvx; this.y+=this.mvy;
+      const mg=this.r+80;
+      if(this.x<mg){this.x=mg;this.mvx=Math.abs(this.mvx);}
+      if(this.x>W-mg){this.x=W-mg;this.mvx=-Math.abs(this.mvx);}
+      if(this.y<mg){this.y=mg;this.mvy=Math.abs(this.mvy);}
+      if(this.y>H-mg){this.y=H-mg;this.mvy=-Math.abs(this.mvy);}
+    }
+  }
+}
+
+// ââ Formation dot â varied shapes morphing into/from circle dot âââââââââââ
+// Shapes: 0=circle, 1=square, 2=triangle, 3=diamond, 4=char
+const FSHAPES=['circle','square','triangle','diamond','char'];
+
+class FormDot {
+  constructor(tx,ty,sx,sy,scale=1){
+    this.tx=tx; this.ty=ty; this.x=sx; this.y=sy;
+    this.scale=scale;
+    this.vx=0; this.vy=0;
+    this.alpha=0; this.state='in';
+    this.delay=Math.floor(Math.random()*22);
+    // Incoming shape (transforms INTO a dot as it forms)
+    this.inShape=FSHAPES[Math.floor(Math.random()*FSHAPES.length)];
+    this.inChar=randChar();
+    this.inRot=Math.random()*Math.PI*2;
+    // Outgoing shape (dot transforms INTO this as it disperses)
+    this.outShape=FSHAPES[Math.floor(Math.random()*FSHAPES.length)];
+    this.outChar=randChar();
+    this.outRot=Math.random()*Math.PI*2;
+    // blend=0: full shape, blend=1: pure circle dot
+    this.blend=0;
+    // Dispersion physics
+    this.accel=1.0;
+    this.scatterX=0; this.scatterY=0; this.startAlpha=0;
+  }
+
+  update(){
+    if(this.delay>0){ this.delay--; return; }
+    if(this.state==='in'){
+      this.x+=(this.tx-this.x)*.15;
+      this.y+=(this.ty-this.y)*.15;
+      this.alpha=Math.min(0.95,this.alpha+0.07);
+      this.blend=Math.min(1,this.blend+0.08);  // morph toward circle
+    } else {
+      // Accelerating outward burst
+      this.vx*=this.accel; this.vy*=this.accel;
+      this.x+=this.vx; this.y+=this.vy;
+      this.blend=Math.max(0,this.blend-0.038);  // morph back to shape
+      // Distance-based opacity: smoothly fades as particle travels outward
+      const dist=Math.sqrt(dist2(this.x,this.y,this.scatterX,this.scatterY));
+      this.alpha=Math.max(0, this.startAlpha*(1-dist/300));
+    }
+  }
+
+  scatter(){
+    this.state='out';
+    // Store origin for distance-based opacity fade
+    this.scatterX=this.x; this.scatterY=this.y;
+    this.startAlpha=this.alpha;
+    const a=Math.random()*Math.PI*2;
+    const spd=0.6+Math.random()*1.4;  // gentle initial speed, acceleration does the work
+    this.vx=Math.cos(a)*spd; this.vy=Math.sin(a)*spd;
+    this.accel=1.040+Math.random()*0.025;  // smooth but clear acceleration
+    // Randomise out shape
+    this.outShape=FSHAPES[Math.floor(Math.random()*FSHAPES.length)];
+    this.outChar=randChar();
+    this.outRot=Math.random()*Math.PI*2;
+  }
+
+  _shape(type,ch,rot,sz){
+    // Draw shape centered at origin (caller must translate)
+    const r=sz;
+    switch(type){
+      case 'circle':
+        g.beginPath(); g.arc(0,0,r,0,Math.PI*2); g.fill(); break;
+      case 'square':
+        g.save(); g.rotate(rot+frame*0.03);
+        g.beginPath(); g.rect(-r,-r,r*2,r*2); g.fill();
+        g.restore(); break;
+      case 'triangle':
+        g.save(); g.rotate(rot+frame*0.025);
+        g.beginPath();
+        g.moveTo(0,-r*1.3); g.lineTo(r*1.15,r*0.75); g.lineTo(-r*1.15,r*0.75);
+        g.closePath(); g.fill();
+        g.restore(); break;
+      case 'diamond':
+        g.save(); g.rotate(rot+frame*0.02);
+        g.beginPath();
+        g.moveTo(0,-r*1.5); g.lineTo(r*1.0,0); g.lineTo(0,r*1.5); g.lineTo(-r*1.0,0);
+        g.closePath(); g.fill();
+        g.restore(); break;
+      case 'char':
+        g.font=`bold ${Math.max(4,r*4)}px "Courier New",monospace`;
+        g.textAlign='center'; g.textBaseline='middle';
+        g.fillText(ch,0,0); break;
+    }
+  }
+
+  draw(){
+    if(this.alpha<0.01) return;
+    const b=this.blend;
+    const shape=this.state==='in'?this.inShape:this.outShape;
+    const ch=this.state==='in'?this.inChar:this.outChar;
+    const rot=this.state==='in'?this.inRot:this.outRot;
+    const r=DOT_R*this.scale;
+    g.save();
+    g.translate(this.x,this.y);
+    g.fillStyle='#111';
+
+    if(b>=0.97){
+      // Pure circle dot â apply heartbeat bounce + opacity flicker when formed
+      const pulse=formPulse;
+      const sc=1+0.10*pulse;          // scale up to +10% on beat peak
+      const pulseAlpha=0.82+0.10*pulse; // opacity 0.82â0.92
+      if(sc>1.001){ g.scale(sc,sc); }
+      g.globalAlpha=pulseAlpha;
+      g.beginPath(); g.arc(0,0,r,0,Math.PI*2); g.fill();
+    } else if(b<=0.03){
+      // Pure shape
+      g.globalAlpha=this.alpha;
+      this._shape(shape,ch,rot,r*1.8);
+    } else {
+      // Cross-fade: shape fades out, circle fades in
+      // Shape component
+      g.globalAlpha=this.alpha*(1-b);
+      this._shape(shape,ch,rot,r*(1+(1-b)*0.9));
+      // Circle component
+      g.globalAlpha=this.alpha*b;
+      g.beginPath(); g.arc(0,0,r,0,Math.PI*2); g.fill();
+    }
+    g.restore();
+  }
+
+  get done(){ return this.state==='out'&&this.alpha<0.01; }
+}
+
+// ââ State machine ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+let formState='idle';
+let formTimer=0;
+let formDots=[];
+let signals=[];
+let misses=[];   // {x,y,age} â shown briefly when a signal expires untriggered
+let nextSignalIn=80;
+let formCX=0, formCY=0;  // formation center for mouse-leave detection
+let formStayR=110;        // scales with signal size
+let formPulse=0;          // 0-1, drives heartbeat bounce when formed
+
+// ââ Game state âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+let combo=0, comboTimer=0;
+const COMBO_TIMEOUT=300;
+let mood=0.5;
+let score=0;                      // integer score: +1 catch, -1 miss, -2 fake
+let gaugePos=0.5;                 // smoothed 0(bottom=-10) â¦ 1(top=+10)
+let lastCatchX=-1,lastCatchY=-1,lastCatchFrame=-9999;
+let chainLine=null;
+let comboPopups=[];
+
+// ââ Play stats (for end screen archetype) ââââââââââââââââââââââââââââââââ
+let statCatches=0, statMisses=0, statFakes=0, statRhythm=0, statMaxCombo=0;
+
+// ââ Web Audio API ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+let audioCtx=null;
+function getAudio(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();  // wake up if browser suspended it
+  return audioCtx;
+}
+
+function playTone(freq, dur, type='sine', vol=0.08, detune=0){
+  try{
+    const ac=getAudio();
+    const osc=ac.createOscillator(), gain=ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type=type; osc.frequency.value=freq; osc.detune.value=detune;
+    gain.gain.setValueAtTime(0,ac.currentTime);
+    gain.gain.linearRampToValueAtTime(vol,ac.currentTime+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+dur);
+    osc.start(ac.currentTime); osc.stop(ac.currentTime+dur);
+  }catch(e){}
+}
+
+function soundCatch(rhythm=false){
+  playTone(880,0.12,'sine',rhythm?0.13:0.08);
+  if(rhythm){ setTimeout(()=>playTone(1108,0.10,'sine',0.07),40); }
+}
+function soundMiss(){ playTone(140,0.18,'sawtooth',0.06); }
+function soundFake(){ playTone(220,0.22,'sawtooth',0.07); playTone(180,0.18,'sawtooth',0.05); }
+function soundCombo(n){ playTone(440+n*55,0.15,'sine',0.07); setTimeout(()=>playTone(660+n*40,0.12,'sine',0.05),60); }
+function soundWin(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,0.25,'sine',0.08),i*120)); }
+function soundLose(){ [392,330,262,196].forEach((f,i)=>setTimeout(()=>playTone(f,0.28,'sawtooth',0.06),i*130)); }
+
+function triggerFormation(fcx,fcy,scale=1){
+  formState='forming'; formTimer=0;
+  formCX=fcx; formCY=fcy;
+  formStayR=110*scale;
+  formDots=GLYPH_OFFSETS.map(({ox,oy})=>{
+    const a=Math.random()*Math.PI*2, d=25+Math.random()*150;
+    return new FormDot(fcx+ox*scale,fcy+oy*scale, fcx+Math.cos(a)*d, fcy+Math.sin(a)*d, scale);
+  });
+}
+function disperseFormation(){
+  formState='dispersing';
+  formDots.forEach(d=>d.scatter());
+}
+
+// ââ Score gauge â desktop: right vertical / mobile: bottom horizontal ââââââââ
+function drawGauge(){
+  g.save();
+  g.setLineDash([]);
+
+  // Shared rainbow colour sampler (reused by both layouts)
+  function sampleRainbow(stops, p){
+    for(let i=0;i<stops.length-1;i++){
+      const [s0,c0]=stops[i],[s1,c1]=stops[i+1];
+      if(p>=s0&&p<=s1){const f=(p-s0)/(s1-s0);return c0.map((v,j)=>Math.round(v+(c1[j]-v)*f));}
+    }
+    return stops[stops.length-1][1];
+  }
+
+  if(!isMobile){
+    // ââ DESKTOP: vertical gauge on right edge ââââââââââââââââââââââââââââââ
+    const gx=W-24;
+    const gt=70, gb=H-70, gh=gb-gt;
+    const indY=gt+(1-gaugePos)*gh;
+
+    const trackGrad=g.createLinearGradient(0,gt,0,gb);
+    trackGrad.addColorStop(0,    'rgba(220,30,30,0.60)');
+    trackGrad.addColorStop(0.15, 'rgba(230,100,20,0.55)');
+    trackGrad.addColorStop(0.30, 'rgba(220,200,20,0.55)');
+    trackGrad.addColorStop(0.45, 'rgba(40,180,40,0.55)');
+    trackGrad.addColorStop(0.60, 'rgba(30,100,210,0.55)');
+    trackGrad.addColorStop(0.75, 'rgba(100,20,180,0.55)');
+    trackGrad.addColorStop(1,    'rgba(10,10,10,0.60)');
+    g.fillStyle=trackGrad;
+    g.fillRect(gx-1,gt,2,gh);
+
+    const stops=[
+      [0,[220,30,30]],[0.15,[230,100,20]],[0.30,[220,200,20]],
+      [0.45,[40,180,40]],[0.60,[30,100,210]],[0.75,[100,20,180]],[1,[10,10,10]]
+    ];
+    const ticks=[{v:10,lbl:'profit +10'},{v:5,lbl:'+5'},{v:0,lbl:'BEP'},{v:-5,lbl:'â5'},{v:-10,lbl:'profit â10'}];
+    g.font='8.4px "Courier New",monospace'; g.textAlign='right'; g.textBaseline='middle';
+    for(const tk of ticks){
+      const ty=gt+((10-tk.v)/20)*gh;
+      const isBep=tk.v===0, isEnd=Math.abs(tk.v)===10;
+      g.strokeStyle=isBep?'rgba(40,40,40,0.30)':isEnd?'rgba(40,40,40,0.22)':'rgba(40,40,40,0.14)';
+      g.lineWidth=1;
+      g.beginPath(); g.moveTo(gx-(isBep?6:4),ty); g.lineTo(gx+3,ty); g.stroke();
+      const lC=sampleRainbow(stops,1-(tk.v+10)/20);
+      g.fillStyle=`rgba(${lC[0]},${lC[1]},${lC[2]},0.40)`;
+      g.fillText(tk.lbl,gx-10,ty);
+    }
+    const rC=sampleRainbow(stops,1-gaugePos);
+    const arrColor=`rgba(${rC[0]},${rC[1]},${rC[2]},0.85)`;
+    const as=4.5;
+    g.fillStyle=arrColor;
+    g.beginPath(); g.moveTo(gx,indY); g.lineTo(gx-as*1.9,indY-as); g.lineTo(gx-as*1.9,indY+as); g.closePath(); g.fill();
+    const lbl=score===0?'BEP':score>0?`+${score}`:`${score}`;
+    g.font='bold 9.6px "Courier New",monospace'; g.fillStyle=arrColor; g.textAlign='right';
+    g.fillText(lbl,gx-13,indY);
+
+  } else {
+    // ââ MOBILE: horizontal gauge at bottom âââââââââââââââââââââââââââââââââ
+    const gy=H-28-safeAreaBottom;
+    const gl=40, gr=W-90, gw=gr-gl;  // gr: W-90 (ë²í¼ ëë¹ ~70px íë³´)
+    const indX=gl+gaugePos*gw;
+
+    const trackGrad=g.createLinearGradient(gl,0,gr,0);
+    trackGrad.addColorStop(0,    'rgba(10,10,10,0.60)');
+    trackGrad.addColorStop(0.25, 'rgba(100,20,180,0.55)');
+    trackGrad.addColorStop(0.40, 'rgba(30,100,210,0.55)');
+    trackGrad.addColorStop(0.55, 'rgba(40,180,40,0.55)');
+    trackGrad.addColorStop(0.70, 'rgba(220,200,20,0.55)');
+    trackGrad.addColorStop(0.85, 'rgba(230,100,20,0.55)');
+    trackGrad.addColorStop(1,    'rgba(220,30,30,0.60)');
+    g.fillStyle=trackGrad;
+    g.fillRect(gl,gy-1,gw,2);
+
+    const stops=[
+      [0,[10,10,10]],[0.25,[100,20,180]],[0.40,[30,100,210]],
+      [0.55,[40,180,40]],[0.70,[220,200,20]],[0.85,[230,100,20]],[1,[220,30,30]]
+    ];
+    const ticks=[{v:-10,lbl:'â10'},{v:-5,lbl:'â5'},{v:0,lbl:'BEP'},{v:5,lbl:'+5'},{v:10,lbl:'+10'}];
+    g.font=`${Math.round(8*SC)}px "Courier New",monospace`; g.textAlign='center'; g.textBaseline='top';
+    for(const tk of ticks){
+      const tx=gl+(tk.v+10)/20*gw;
+      const isBep=tk.v===0, isEnd=Math.abs(tk.v)===10;
+      g.strokeStyle=isBep?'rgba(40,40,40,0.30)':isEnd?'rgba(40,40,40,0.22)':'rgba(40,40,40,0.14)';
+      g.lineWidth=1;
+      g.beginPath(); g.moveTo(tx,gy-(isBep?6:4)); g.lineTo(tx,gy+3); g.stroke();
+      const lC=sampleRainbow(stops,(tk.v+10)/20);
+      g.fillStyle=`rgba(${lC[0]},${lC[1]},${lC[2]},0.45)`;
+      g.fillText(tk.lbl,tx,gy+6);
+    }
+    const rC=sampleRainbow(stops,gaugePos);
+    const arrColor=`rgba(${rC[0]},${rC[1]},${rC[2]},0.85)`;
+    const as=5*SC;
+    g.fillStyle=arrColor;
+    g.beginPath(); g.moveTo(indX,gy); g.lineTo(indX-as,gy-as*1.9); g.lineTo(indX+as,gy-as*1.9); g.closePath(); g.fill();
+    const lbl=score===0?'BEP':score>0?`+${score}`:`${score}`;
+    g.font=`bold ${Math.round(10*SC)}px "Courier New",monospace`;
+    g.fillStyle=arrColor; g.textAlign='center'; g.textBaseline='bottom';
+    g.fillText(lbl,indX,gy-as*2.2);
+  }
+
+  g.restore();
+}
+
+// ââ Custom cursor ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function drawCursor(){
+  if(mouseX<0) return;
+  g.save();
+  g.strokeStyle='rgba(50,50,50,.6)'; g.lineWidth=1;
+  g.beginPath(); g.arc(mouseX,mouseY,4,0,Math.PI*2); g.stroke();
+  g.restore();
+}
+
+// ââ Main loop ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ââ Game-over state âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+let gameOver=false;
+let gameOverType=null; // 'win' | 'lose'
+let winCount=0, loseCount=0;
+const COUNTER_NS='circle-chronograph-profit';
+
+async function fetchCounts(){
+  try{
+    const [w,l]=await Promise.all([
+      fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/win`).then(r=>r.json()),
+      fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/lose`).then(r=>r.json())
+    ]);
+    winCount=w.count||0; loseCount=l.count||0;
+  } catch(e){ /* offline â counts stay 0 */ }
+}
+
+async function triggerGameOver(type){
+  if(gameOver) return;
+  gameOver=true; gameOverType=type;
+  signals=[]; formDots=[]; formState='idle';
+  if(type==='win') soundWin(); else soundLose();
+  try{
+    const res=await fetch(`https://api.counterapi.dev/v1/${COUNTER_NS}/${type}/up`).then(r=>r.json());
+    if(type==='win') winCount=res.count||winCount+1;
+    else             loseCount=res.count||loseCount+1;
+  } catch(e){
+    if(type==='win') winCount++; else loseCount++;
+  }
+  showEndScreen();
+}
+
+function showEndScreen(){
+  const overlay=document.createElement('div');
+  overlay.id='end-overlay';
+  const isWin=gameOverType==='win';
+  overlay.style.cssText=`
+    position:fixed;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    background:rgba(255,255,255,0.88);
+    font-family:"Courier New",monospace;
+    z-index:9999;backdrop-filter:blur(6px);
+  `;
+  const total=winCount+loseCount;
+  const winPct=total>0?Math.round(winCount/total*100):0;
+  const precision=statCatches+statMisses>0?statCatches/(statCatches+statMisses):0;
+
+  const mob=isMobile;
+  overlay.innerHTML=`
+    <div style="text-align:center;width:100%;max-width:420px;padding:0 ${mob?'20px':'24px'}">
+      <div style="font-size:${mob='12':'11'}px;letter-spacing:0.18em;color:#999;margin-bottom:${mob='20':'28'}px;text-transform:uppercase">
+        ${isWin ? 'profit +10 achieved' : 'profit â10 reached'}
+      </div>
+      <div style="font-size:clamp(${mob?736px':'28px'},${mob?'12':'6'}vw,${mob?'60':'52'}px);font-weight:700;letter-spacing:-0.02em;
+        color:${isWin?'rgba(190,30,30,0.85)':'rgba(20,20,20,0.85)'};margin-bottom:12px;line-height:1.1">
+        ${isWin ? '+PROFIT' : 'âPROFIT'}
+      </div>
+      <div style="font-size:${mob='15':'13'}px;color:#666;margin-bottom:${mob?'20':'16'}px;line-height:1.8">
+        ${isWin
+          ? 'All signals captured.<br>Maximum profit unlocked.'
+          : 'Too many signals missed.<br>Position closed at a loss.'}
+      </div>
+      <div style="margin-bottom:${mob?'20':'28'}px;padding:${mob?'14px 24px':'12px 20px'};border:1px solid #eee;display:inline-block">
+        <div style="font-size:${mob?'11':'9'}px;color:#ccc;letter-spacing:0.06em">
+          ${statCatches}C Â· ${statMisses}M Â· Ã${statMaxCombo} MAX Â· ${Math.round(precision*100)}% precision
+          ${statRhythm>0?' Â· '+statRhythm+' rhythm':''}
+        </div>
+      </div>
+      <div style="border-top:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;
+        padding:${mob?'24px':'20px'} 0;margin-bottom:${mob='28':'32'}px">
+        <div style="font-size:${mob='11':'10'}px;letter-spacing:0.14em;color:#aaa;margin-bottom:14px;text-transform:uppercase">
+          global record
+        </div>
+        <div style="display:flex;gap:${mob?'48':'40'}px;justify-content:center;align-items:flex-end">
+          <div style="text-align:center">
+            <div style="font-size:clamp(${mob?'28':'22'}px,5vw,38px);font-weight:700;color:rgba(190,30,30,0.80)">${winCount.toLocaleString()}</div>
+            <div style="font-size:${mob?'11':'10'}px;color:#aaa;letter-spacing:0.1em;margin-top:4px">PROFIT+</div>
+          </div>
+          <div style="text-align:center;padding-bottom:4px">
+            <div style="font-size:${mob?'15':'13'}px;color:#ccc">/</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:clamp(${mob?'28':'22'}px,5vw,38px);font-weight:700;color:rgba(20,20,20,0.55)">${loseCount.toLocaleString()}</div>
+            <div style="font-size:${mob?'11':'10'}px;color:#aaa;letter-spacing:0.1em;margin-top:4px">PROFITâ</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;font-size:${mob?'11':'10'}px;color:#bbb">
+          ${winPct}% of players reached max profit
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:${mob?'14':'10'}px">
+        <button id="restart-btn" style="
+          background:none;border:1px solid #ccc;
+          padding:${mob?'14px 0':'10px 32px'};font-family:'Courier New',monospace;
+          font-size:${mob?'13':'11'}px;letter-spacing:0.14em;color:#666;
+          cursor:pointer;text-transform:uppercase;width:${mob?'240px':'180px'};
+          transition:border-color 0.2s,color 0.2s;-webkit-tap-highlight-color:transparent">
+          play again <span id="restart-countdown" style="color:#bbb">(30)</span>
+        </button>
+        <button id="share-btn" style="
+          background:none;border:1px solid #e8e8e8;
+          padding:${mob?'14px 0':'10px 32px'};font-family:'Courier New',monospace;
+          font-size:${mob?'13':'11'}px;letter-spacing:0.14em;color:#bbb;
+          cursor:pointer;text-transform:uppercase;width:${mob?'240px':'180px'};
+          transition:border-color 0.2s,color 0.2s;-webkit-tap-highlight-color:transparent">
+          share
+        </button>
+        <div id="share-toast" style="
+          font-size:${mob?'12':'10'}px;letter-spacing:0.1em;color:#aaa;
+          height:16px;text-align:center;transition:opacity 0.3s;opacity:0">
+          link copied
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // ââ Restart ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  function doRestart(){
+    clearInterval(cdInterval);
+    if(!document.body.contains(overlay)) return;
+    document.body.removeChild(overlay);
+    score=0; gaugePos=0.5; combo=0; comboTimer=0;
+    mood=0.5; signals=[]; misses=[]; formDots=[];
+    formState='idle'; chainLine=null; comboPopups=[];
+    lastCatchFrame=-9999; nextSignalIn=80;
+    gameOver=false; gameOverType=null;
+    statCatches=0; statMisses=0; statFakes=0; statRhythm=0; statMaxCombo=0;
+  }
+  document.getElementById('restart-btn').addEventListener('click', doRestart);
+
+  // 30ì´ ì¹´ì´í¸ë¤ì´ í ìë ì¬ìì
+  let cdSec=30;
+  const cdEl=document.getElementById('restart-countdown');
+  const cdInterval=setInterval(()=>{
+    cdSec--;
+    if(cdEl) cdEl.textContent=`(${cdSec})`;
+    if(cdSec<=0) doRestart();
+  }, 1000);
+  document.getElementById('restart-btn').addEventListener('mouseenter',e=>{
+    e.target.style.borderColor='#888'; e.target.style.color='#333';
+  });
+  document.getElementById('restart-btn').addEventListener('mouseleave',e=>{
+    e.target.style.borderColor='#ccc'; e.target.style.color='#666';
+  });
+
+  // ââ Share ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  document.getElementById('share-btn').addEventListener('click', async ()=>{
+    const url=location.href;
+    const shareData={
+      title:'Profit Field',
+      text: gameOverType==='win'
+        ? 'I reached +PROFIT 10 in Profit Field. Can you beat it?'
+        : 'I got crushed at âPROFIT 10 in Profit Field. Give it a try.',
+      url
+    };
+    if(navigator.share && navigator.canShare && navigator.canShare(shareData)){
+      // Mobile: native share sheet (KakaoTalk, WhatsApp, AirDrop, etc.)
+      try{ await navigator.share(shareData); } catch(e){ /* dismissed */ }
+    } else {
+      // Desktop: copy URL to clipboard + show toast
+      try{
+        await navigator.clipboard.writeText(url);
+      } catch(e){
+        // Fallback for older browsers
+        const ta=document.createElement('textarea');
+        ta.value=url; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      const toast=document.getElementById('share-toast');
+      toast.style.opacity='1';
+      setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
+    }
+  });
+  document.getElementById('share-btn').addEventListener('mouseenter',e=>{
+    e.target.style.borderColor='#bbb'; e.target.style.color='#888';
+  });
+  document.getElementById('share-btn').addEventListener('mouseleave',e=>{
+    e.target.style.borderColor='#e8e8e8'; e.target.style.color='#bbb';
+  });
+}
+
+fetchCounts(); // pre-fetch current counts on page load
+
+function loop(){
+  if(gameOver){ requestAnimationFrame(loop); return; }
+  requestAnimationFrame(loop);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); // re-apply every frame â save/restore can't corrupt it
+  frame++;
+
+  // ââ Combo timer + mood drift âââââââââââââââââââââââââââââââââââââââââââââ
+  if(++comboTimer>COMBO_TIMEOUT&&combo>0) combo=0;
+  mood+=(0.5-mood)*0.0008;
+  gaugePos+=(((score+10)/20)-gaugePos)*0.06; // smooth to target
+
+  // ââ Mouse idle tracking ââââââââââââââââââââââââââââââââââââââââââââââââââ
+  const dxM=mouseX-lastMouseX, dyM=mouseY-lastMouseY;
+  if(dxM*dxM+dyM*dyM>1){ mouseIdleFrames=0; } else if(mouseX>-100){ mouseIdleFrames++; }
+  lastMouseX=mouseX; lastMouseY=mouseY;
+
+  // ââ Heartbeat pulse (finish prev work) âââââââââââââââââââââââââââââââââââ
+  // Sharp ~75 BPM sine pulses; only active while 'formed'
+  if(formState==='formed'){
+    formPulse=Math.pow(Math.max(0,Math.sin(frame*0.13)),1.5);
+  } else {
+    formPulse=Math.max(0,formPulse-0.07); // quick fade-out when not formed
+  }
+
+  // Signal lifecycle â each signal lives and dies independently
+  for(let i=signals.length-1;i>=0;i--){
+    const sig=signals[i];
+    sig.update();
+    if(sig.canTrigger&&sig.containsMouse()&&(formState==='idle'||formState==='dispersing'||formState==='forming')){
+      if(formState==='dispersing'||formState==='forming'){ formDots=[]; formState='idle'; }   // clear old scatter/form immediately
+      sig.triggered=true; sig.maxAge=sig.age+8;
+      if(sig.fake){
+        misses.push({x:sig.hotX,y:sig.hotY,age:0,big:true});
+        combo=0; comboTimer=0; mood=Math.max(0,mood-0.18);
+        score=Math.max(-10,score-2);
+        statFakes++;
+        soundFake();
+        if(isMobile&&navigator.vibrate) navigator.vibrate([25,40,25]); // double-buzz for fake
+        if(score<=-10) triggerGameOver('lose');
+        for(let ri=0;ri<4;ri++) ripples.push({x:sig.hotX+(Math.random()-.5)*35,y:sig.hotY+(Math.random()-.5)*35,r:5});
+      } else {
+        const isRhythm=sig.atPeak;
+        const dt=frame-lastCatchFrame;
+        if(lastCatchFrame>0&&dt<95) chainLine={x1:lastCatchX,y1:lastCatchY,x2:sig.hotX,y2:sig.hotY,age:0};
+        lastCatchX=sig.hotX; lastCatchY=sig.hotY; lastCatchFrame=frame;
+        combo++; comboTimer=0; mood=Math.min(1,mood+0.09);
+        // Rhythm bonus: +2 on peak pulse, +1 otherwise
+        const scoreGain=isRhythm?2:1;
+        score=Math.min(10,score+scoreGain);
+        statCatches++; if(isRhythm) statRhythm++;
+        if(combo>statMaxCombo) statMaxCombo=combo;
+        soundCatch(isRhythm);
+        if(isMobile&&navigator.vibrate) navigator.vibrate(isRhythm?[15,20,30]:20); // rhythm = two pulses
+        if(combo>1&&combo%3===0) soundCombo(combo);
+        if(isRhythm) comboPopups.push({x:sig.hotX,y:sig.hotY-18,n:'RHYTHM',age:0,rhythm:true});
+        if(score>=10) triggerGameOver('win');
+        const scale=(sig.r/80)*(1+Math.min(combo-1,5)*0.08);
+        triggerFormation(sig.hotX,sig.hotY,scale);
+        if(combo>1) comboPopups.push({x:sig.hotX,y:sig.hotY,n:combo,age:0});
+      }
+    }
+    if(sig.age>sig.maxAge){
+      if(!sig.triggered){
+        misses.push({x:sig.x,y:sig.y,age:0,big:false});
+        mood=Math.max(0,mood-0.04);
+        score=Math.max(-10,score-1);
+        statMisses++; soundMiss();
+        if(isMobile&&navigator.vibrate) navigator.vibrate(12); // light buzz on miss
+        if(score<=-10) triggerGameOver('lose');
+      }
+      signals.splice(i,1);
+    }
+  }
+  // Staggered independent spawning: organic timing, occasional bursts
+  if(--nextSignalIn<=0){
+    const activeCount=signals.filter(s=>!s.triggered).length;
+    if(activeCount<4){
+      signals.push(new Signal());
+      // When screen is empty, occasionally add a second signal
+      if(activeCount===0 && Math.random()<0.25) signals.push(new Signal());
+    }
+    // 20% chance of a long breather (6~10s); otherwise slower re-spawn
+    nextSignalIn=Math.random()<0.20
+      ? 360+Math.floor(Math.random()*240)   // long pause 6~10s
+      : 160+Math.floor(Math.random()*100);  // moderate gap ~2.7-4.3s
+  }
+
+  // Formation states
+  if(formState==='forming'){
+    if(++formTimer>50){ formState='formed'; formTimer=0; }
+  } else if(formState==='formed'){
+    // Disperse: mouse leaves zone OR ~1 second (60 frames) passes
+    const mouseLeft=dist2(mouseX,mouseY,formCX,formCY)>formStayR*formStayR;
+    if(mouseLeft||++formTimer>60){ disperseFormation(); formTimer=0; }
+  } else if(formState==='dispersing'){
+    formDots=formDots.filter(d=>!d.done);
+    if(formDots.length===0){
+      formState='idle';
+      nextSignalIn=Math.max(nextSignalIn,60); // brief pause before next can trigger
+    }
+  }
+
+  // ââ Expand ripples ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  for(let i=ripples.length-1;i>=0;i--){
+    ripples[i].r+=RIPPLE_SPEED;
+    if(ripples[i].r>RIPPLE_MAX_R) ripples.splice(i,1);
+  }
+
+  // Draw background
+  g.clearRect(0,0,W,H);
+  // Mood-tinted background: warm when catching well, cool when missing
+  // Background: mood + score both influence temperature
+  const _md=(mood-0.5)*2;          // mood: -1..1
+  const _sc=score/10;              // score: -1..1
+  const _t=_md*0.4+_sc*0.6;       // blend (score-dominant)
+  g.fillStyle=_t>=0
+    ?`rgb(255,${Math.round(255-_t*10)},${Math.round(255-_t*22)})`
+    :`rgb(${Math.round(255+_t*22)},${Math.round(255+_t*10)},255)`;
+  g.fillRect(0,0,W,H);
+
+  for(const p of parts){ p.update(signals); if(p.dead) p.init(false); }
+  parts.sort((a,b)=>b.z-a.z);
+  for(const p of parts) p.draw(signals);
+
+  // ââ Particle-web signal zone indicators ââââââââââââââââââââââââââââââââââ
+  for(const sig of signals){
+    if(sig.triggered) continue;
+    const blobFadeIn=Math.min(1,(sig.age-sig.blobStartAge)/35);
+    if(blobFadeIn<=0) continue;
+    const baseAlpha=Math.min(0.55,sig.intensity*0.65*blobFadeIn);
+    if(baseAlpha<0.02) continue;
+    const hx=sig.hotX, hy=sig.hotY, hr=sig.hotR;
+    if(hr<5) continue;
+
+    // Gather particles within wide signal zone (screen space)
+    // zoneR uses sig.r directly â decoupled from hotR (catch sensitivity)
+    const zoneR=sig.r*(1.6+1.6*Math.abs(Math.sin(sig.age*0.040+sig.phase)));   // wide visual radius
+    const near=[];
+    for(const p of parts){
+      const dx=p.sx-hx, dy=p.sy-hy;
+      const d2=dx*dx+dy*dy;
+      if(d2<zoneR*zoneR) near.push({p, d2, dist:Math.sqrt(d2)});
+    }
+    if(near.length<2) continue;
+
+    g.save();
+    g.setLineDash([]);
+
+    // Connect across full zone â long-range web
+    // Each particle connects to up to 5 nearest others (prevents spaghetti but keeps spread)
+    const MAX_CONN=5;
+    const drawn=new Set();
+    for(let i=0;i<near.length;i++){
+      let connCount=0;
+      // Sort potential partners by distance for this particle
+      const partners=[];
+      for(let j=0;j<near.length;j++){
+        if(i===j) continue;
+        const ax=near[i].p.sx, ay=near[i].p.sy;
+        const bx=near[j].p.sx, by=near[j].p.sy;
+        const dx=ax-bx, dy=ay-by;
+        partners.push({j, d2:dx*dx+dy*dy});
+      }
+      partners.sort((a,b)=>a.d2-b.d2);
+      for(const {j, d2} of partners){
+        if(connCount>=MAX_CONN) break;
+        const key=i<j?`${i}-${j}`:`${j}-${i}`;
+        if(drawn.has(key)) continue;
+        drawn.add(key);
+        const dist=Math.sqrt(d2);
+        // Alpha: fade by distance between the two particles (capped to avoid NaN)
+        const distFade=Math.max(0, 1-dist/(zoneR*1.6));
+        const lineAlpha=baseAlpha*distFade*0.90;
+        if(lineAlpha<0.015) continue;
+        g.strokeStyle=`rgba(30,30,30,${lineAlpha.toFixed(3)})`;
+        g.lineWidth=Math.max(0.4, 0.7*SC);
+        g.beginPath();
+        g.moveTo(near[i].p.sx, near[i].p.sy);
+        g.lineTo(near[j].p.sx, near[j].p.sy);
+        g.stroke();
+        connCount++;
+      }
+    }
+
+    // Small pulsing node dots at each particle position inside zone
+    const pulse=0.6+0.4*Math.sin(sig.age*0.12+sig.phase);
+    for(const {p, dist} of near){
+      const nodeFade=(1-dist/zoneR)*baseAlpha*pulse*1.1;
+      if(nodeFade<0.02) continue;
+      g.fillStyle=`rgba(30,30,30,${Math.min(0.55,nodeFade).toFixed(3)})`;
+      g.beginPath();
+      g.arc(p.sx, p.sy, 1.2, 0, Math.PI*2);
+      g.fill();
+    }
+
+    // Hotspot indicator
+    g.setLineDash([]);
+    if(!isMobile){
+      // Desktop: faint dashed ring
+      g.strokeStyle=`rgba(40,40,40,${(baseAlpha*0.22).toFixed(3)})`;
+      g.lineWidth=0.6;
+      g.setLineDash([2,6]);
+      g.lineDashOffset=-(sig.age*0.22)%8;
+      g.beginPath();
+      g.arc(hx, hy, hr*(0.90+0.10*Math.sin(sig.age*0.045+sig.phase)), 0, Math.PI*2);
+      g.stroke();
+      g.setLineDash([]);
+    } else {
+      // Mobile: no ring â ultra-faint filled shadow, 0â4% opacity.
+      // Feels like intuition rather than instruction.
+      const pulse=(Math.sin(sig.age*0.08+sig.phase)*0.5+0.5);
+      const faintA=Math.min(0.04, baseAlpha*(0.015+pulse*0.025));
+      g.fillStyle=`rgba(40,40,40,${faintA.toFixed(3)})`;
+      g.beginPath();
+      g.arc(hx, hy, hr*0.55, 0, Math.PI*2);
+      g.fill();
+    }
+
+    g.restore();
+  }
+
+  // ââ Miss indicators: -profit fades in/out where signal expired untriggered â
+  for(let i=misses.length-1;i>=0;i--){
+    const m=misses[i];
+    m.age++;
+    const MISS_LIFE=100;
+    if(m.age>MISS_LIFE){ misses.splice(i,1); continue; }
+    // Fade in for first 15 frames, hold, fade out for last 30
+    const fadeIn=Math.min(1,m.age/15);
+    const fadeOut=Math.max(0,1-(m.age-MISS_LIFE+30)/30);
+    const alpha=Math.min(fadeIn,fadeOut)*0.70;
+    if(alpha<0.01) continue;
+    g.save();
+    g.globalAlpha=alpha;
+    g.font=m.big?'bold 22px "Courier New",monospace':'bold 16px "Courier New",monospace';
+    g.fillStyle='#222';
+    g.textAlign='center';
+    g.textBaseline='middle';
+    const drift=-18*(m.age/MISS_LIFE);
+    g.fillText('-profit',m.x,m.y+drift);
+    g.restore();
+  }
+
+  // ââ Chain line (two consecutive catches) âââââââââââââââââââââââââââââââââ
+  if(chainLine){
+    chainLine.age++;
+    if(chainLine.age>70) chainLine=null;
+    else{
+      g.save(); g.globalAlpha=(1-chainLine.age/70)*0.28;
+      g.strokeStyle='#222'; g.lineWidth=0.7; g.setLineDash([3,5]);
+      g.beginPath(); g.moveTo(chainLine.x1,chainLine.y1); g.lineTo(chainLine.x2,chainLine.y2); g.stroke();
+      g.restore();
+    }
+  }
+
+  // ââ Combo popups ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  for(let i=comboPopups.length-1;i>=0;i--){
+    const cp=comboPopups[i]; cp.age++;
+    if(cp.age>60){ comboPopups.splice(i,1); continue; }
+    const t=cp.age/60;
+    const a=(t<0.2?t/0.2:1-t)*0.50;
+    g.save(); g.globalAlpha=a;
+    g.font=cp.rhythm?'bold 10px "Courier New",monospace':'bold 12px "Courier New",monospace';
+    g.fillStyle=cp.rhythm?'rgba(190,30,30,0.85)':'#111';
+    g.textAlign='center'; g.textBaseline='middle';
+    g.fillText(cp.rhythm?cp.n:`Ã${cp.n}`,cp.x,cp.y-30*t);
+    g.restore();
+  }
+
+  // Formation dots (screen-space, no 3D projection)
+  for(const d of formDots){ d.update(); d.draw(); }
+
+  drawGauge();
+  if(!isMobile){
+    drawCursor();
+  } else if(touchPoints.size>0){
+    // Draw subtle touch indicators for each active finger
+    for(const tp of touchPoints.values()){    g.save();
+      g.beginPath();
+      g.arc(tp.x, tp.y, 20*SC, 0, Math.PI*2);
+      g.strokeStyle='rgba(40,40,40,0.28)';
+      g.lineWidth=1.2;
+      g.stroke();
+      g.beginPath();
+      g.arc(tp.x, tp.y, 3.5*SC, 0, Math.PI*2);
+      g.fillStyle='rgba(40,40,40,0.40)';
+      g.fill();
+      g.restore();
+    }
+  }
+}
+loop();
+</script>
+
+</body>
+</html>
