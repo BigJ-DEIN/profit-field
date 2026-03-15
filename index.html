@@ -57,69 +57,101 @@ function resize(){
 }
 resize();
 window.addEventListener('resize', resize);
+// visualViewport resize = 주소창 높이 변화 감지 (모바일 게이지 위치 즉시 반영)
+if(window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
-// ── Scroll-down button (mobile only) ─────────────────────────────────────
+// ── Scroll button (mobile only) — up/down bidirectional ──────────────────
 if(isMobile){
-  // Keyframe animations: top chevron pulses first, bottom follows with a delay
   const scrollStyle=document.createElement('style');
   scrollStyle.textContent=`
-    @keyframes chev1{
-      0%,100%{opacity:0.20;transform:translateY(0px);}
-      25%{opacity:0.90;transform:translateY(3px);}
-      50%{opacity:0.20;transform:translateY(0px);}
+    @keyframes sparkU1{
+      0%,100%{opacity:0.18;transform:translateY(0);}
+      30%{opacity:0.95;transform:translateY(-3px);}
+      60%{opacity:0.18;transform:translateY(0);}
     }
-    @keyframes chev2{
-      0%,15%,100%{opacity:0.10;transform:translateY(0px);}
-      45%{opacity:0.70;transform:translateY(4px);}
-      65%{opacity:0.10;transform:translateY(0px);}
+    @keyframes sparkU2{
+      0%,20%,100%{opacity:0.08;transform:translateY(0);}
+      55%{opacity:0.65;transform:translateY(-4px);}
+      80%{opacity:0.08;transform:translateY(0);}
+    }
+    @keyframes sparkD1{
+      0%,100%{opacity:0.18;transform:translateY(0);}
+      30%{opacity:0.95;transform:translateY(3px);}
+      60%{opacity:0.18;transform:translateY(0);}
+    }
+    @keyframes sparkD2{
+      0%,20%,100%{opacity:0.08;transform:translateY(0);}
+      55%{opacity:0.65;transform:translateY(4px);}
+      80%{opacity:0.08;transform:translateY(0);}
     }
     #scroll-btn{
       position:fixed;
       right:16px;
-      bottom:calc(22px + env(safe-area-inset-bottom,0px));
-      width:60px;
-      background:none;border:none;padding:8px 4px 6px;
-      cursor:pointer;
-      display:flex;flex-direction:column;align-items:center;gap:0px;
+      top:50%;
+      transform:translateY(-50%);
+      width:48px;
+      background:none;border:none;padding:0;
+      display:flex;flex-direction:column;align-items:center;gap:0;
       -webkit-tap-highlight-color:transparent;
-      z-index:100;touch-action:manipulation;
+      z-index:100;
       user-select:none;-webkit-user-select:none;
     }
+    .scroll-zone{
+      display:flex;flex-direction:column;align-items:center;
+      padding:7px 6px;cursor:pointer;touch-action:manipulation;
+    }
+    .scroll-zone:active{ opacity:0.4; }
     #scroll-btn .s-label{
       font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
       font-size:8px;letter-spacing:0.18em;
       font-weight:800;
-      color:rgba(25,25,25,0.55);
+      color:rgba(25,25,25,0.45);
       text-transform:uppercase;
-      margin-bottom:4px;
+      line-height:1;pointer-events:none;
     }
-    #scroll-btn .c1{ animation:chev1 2.0s ease-in-out infinite; }
-    #scroll-btn .c2{ animation:chev2 2.0s ease-in-out infinite; }
+    #scroll-btn .cu1{ animation:sparkU1 2.0s ease-in-out infinite; }
+    #scroll-btn .cu2{ animation:sparkU2 2.0s ease-in-out infinite; }
+    #scroll-btn .cd1{ animation:sparkD1 2.0s ease-in-out infinite; }
+    #scroll-btn .cd2{ animation:sparkD2 2.0s ease-in-out infinite; }
   `;
   document.head.appendChild(scrollStyle);
 
-  const scrollBtn=document.createElement('button');
+  const scrollBtn=document.createElement('div');
   scrollBtn.id='scroll-btn';
-  // Two stacked SVG chevrons — gap 줄이고(height:16), 선 얇게(stroke-width:2)
   scrollBtn.innerHTML=`
+    <div id="scroll-up" class="scroll-zone">
+      <svg class="cu2" width="32" height="10" viewBox="0 0 44 20" fill="none">
+        <polyline points="3,17 22,3 41,17" stroke="rgba(15,15,15,0.85)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <svg class="cu1" width="32" height="10" viewBox="0 0 44 20" fill="none">
+        <polyline points="3,17 22,3 41,17" stroke="rgba(15,15,15,0.85)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
     <span class="s-label">scroll</span>
-    <svg class="c1" width="36" height="11" viewBox="0 0 44 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <polyline points="3,3 22,17 41,3" stroke="rgba(15,15,15,0.88)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <svg class="c2" width="36" height="11" viewBox="0 0 44 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <polyline points="3,3 22,17 41,3" stroke="rgba(15,15,15,0.88)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
+    <div id="scroll-down" class="scroll-zone">
+      <svg class="cd1" width="32" height="10" viewBox="0 0 44 20" fill="none">
+        <polyline points="3,3 22,17 41,3" stroke="rgba(15,15,15,0.85)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <svg class="cd2" width="32" height="10" viewBox="0 0 44 20" fill="none">
+        <polyline points="3,3 22,17 41,3" stroke="rgba(15,15,15,0.85)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
   `;
   document.body.appendChild(scrollBtn);
 
-  // 스크롤 버튼 클릭: 가능한 모든 방법으로 부모 페이지 스크롤 시도
-  scrollBtn.addEventListener('click', ()=>{
+  // 위로 스크롤 (100vh)
+  document.getElementById('scroll-up').addEventListener('click', ()=>{
     const h = window.innerHeight;
-    // 1) postMessage — Framer 등 부모가 수신할 경우 대비
+    try{ window.parent.postMessage({type:'scrollUp', amount:-h},'*'); }catch(_){}
+    try{ window.parent.scrollBy({top:-h,behavior:'smooth'}); }catch(_){}
+    window.scrollBy({top:-h,behavior:'smooth'});
+  });
+
+  // 아래로 스크롤 (100vh)
+  document.getElementById('scroll-down').addEventListener('click', ()=>{
+    const h = window.innerHeight;
     try{ window.parent.postMessage({type:'scrollDown', amount:h},'*'); }catch(_){}
-    // 2) 직접 scrollBy — same-origin일 때만 동작 (cross-origin은 SecurityError → 무시)
     try{ window.parent.scrollBy({top:h,behavior:'smooth'}); }catch(_){}
-    // 3) 자기 자신 스크롤 (standalone 페이지일 때)
     window.scrollBy({top:h,behavior:'smooth'});
   });
 }
@@ -179,11 +211,11 @@ window.addEventListener('mousemove', e=>{ handleMove(e.clientX, e.clientY); });
 // Exempt buttons & links so synthetic click events still fire (end-screen buttons, scroll btn).
 if(isMobile){
   document.addEventListener('touchstart', e=>{
-    if(e.target.closest('button,a,[role="button"]')) return;
+    if(e.target.closest('button,a,[role="button"],.scroll-zone')) return;
     e.preventDefault();
   }, {passive:false});
   document.addEventListener('touchmove', e=>{
-    if(e.target.closest('button,a,[role="button"]')) return;
+    if(e.target.closest('button,a,[role="button"],.scroll-zone')) return;
     e.preventDefault();
   }, {passive:false});
 }
@@ -764,8 +796,12 @@ function drawGauge(){
 
   } else {
     // ── MOBILE: horizontal gauge at bottom ─────────────────────────────────
-    const gy=H-28-safeAreaBottom;
-    const gl=40, gr=W-90, gw=gr-gl;  // gr: W-90 (버튼 너비 ~70px 확보)
+    // visualViewport.height = 주소창 포함 실제 보이는 높이 → 잘림 방지
+    const visH = (window.visualViewport ? window.visualViewport.height : H);
+    // 캔버스 좌표계로 변환: 캔버스는 innerHeight(H) 기준, visH가 더 작을 수 있음
+    const gaugeBottom = Math.min(H, visH) - 52 - safeAreaBottom;
+    const gy = gaugeBottom;
+    const gl=16, gr=W-90, gw=gr-gl;
     const indX=gl+gaugePos*gw;
 
     const trackGrad=g.createLinearGradient(gl,0,gr,0);
