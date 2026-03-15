@@ -13,6 +13,24 @@
     canvas { display:block;width:100%;height:100%;cursor:none; }
     /* safe-area helper — readable via JS */
     #safe-area-probe { position:fixed;bottom:0;width:1px;height:env(safe-area-inset-bottom,0px);pointer-events:none; }
+
+    /* ── 모바일 스크롤 즉시 차단 (JS 실행 전부터 적용) ──────────────────────
+       pointer:coarse = 터치스크린. JS setTimeout 없이 브라우저가 렌더링하는
+       첫 프레임부터 touch-action:none 이 걸려 scroll 제스처 자체를 무효화.  */
+    @media (pointer:coarse) {
+      html, body {
+        position: fixed;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: auto;
+      }
+      canvas {
+        touch-action: none;
+      }
+    }
   </style>
 </head>
 <body>
