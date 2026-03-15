@@ -397,7 +397,7 @@ const parts=Array.from({length:COUNT},()=>new Pt(true));
 
 // ── PROFIT letterforms — pixel-extracted from reference image ─────────────
 // Half size: DOT_PITCH=3px, DOT_R=1.5px
-const DOT_PITCH=3, DOT_R=1.5, VCENTER=11.5, LETTER_GA[=0;
+const DOT_PITCH=3, DOT_R=1.5, VCENTER=11.5, LETTER_GAP=0;
 
 const LETTER_DEFS=[
   // + — 11w×15h + 5 zero cols right-padding for gap, dy=5
@@ -683,7 +683,7 @@ function playTone(freq, dur, type='sine', vol=0.08, detune=0){
 }
 
 function soundCatch(rhythm=false){
-  playTone(880,0.12,'sine',aluthm?0.13:0.08);
+  playTone(880,0.12,'sine',rhythm?0.13:0.08);
   if(rhythm){ setTimeout(()=>playTone(1108,0.10,'sine',0.07),40); }
 }
 function soundMiss(){ playTone(140,0.18,'sawtooth',0.06); }
@@ -1132,7 +1132,7 @@ function loop(){
     if(sig.triggered) continue;
     const blobFadeIn=Math.min(1,(sig.age-sig.blobStartAge)/35);
     if(blobFadeIn<=0) continue;
-    const baseAlpha=Math.min(0.55,s)g.intensity*0.65*blobFadeIn);
+    const baseAlpha=Math.min(0.55,sig.intensity*0.65*blobFadeIn);
     if(baseAlpha<0.02) continue;
     const hx=sig.hotX, hy=sig.hotY, hr=sig.hotR;
     if(hr<5) continue;
