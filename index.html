@@ -157,11 +157,10 @@ if(isMobile){
 
 // ── 스크롤 처리: 모바일 차단 / 데스크탑 체이닝 ──────────────────────────
 if(isMobile){
-  // 모바일: 스크롤·줌·rubber-band 완전 차단
-  document.documentElement.style.overflow='hidden';
-  document.body.style.overflow='hidden';
-  document.body.style.touchAction='none';
-  document.body.style.overscrollBehavior='none';
+  // 모바일: 스크롤·줌·rubber-band 완전 차단 (position:fixed = iOS Safari 완벽 잠금)
+  const _s = s => { s.overflow='hidden'; s.position='fixed'; s.width='100%'; s.height='100%'; s.touchAction='none'; s.overscrollBehavior='none'; };
+  _s(document.documentElement.style);
+  _s(document.body.style);
   document.querySelector('canvas').style.touchAction='none';
 } else {
   // 데스크탑: overflow:auto + overscroll-behavior:auto 로 브라우저 scroll chaining 활성화.
@@ -207,15 +206,16 @@ window.addEventListener('mousemove', e=>{ handleMove(e.clientX, e.clientY); });
 // (Canvas-level listeners can silently fail on iOS; document-level is bulletproof)
 
 // Prevent default touch behavior (scroll / zoom / rubber-band) — mobile only.
-// Exempt buttons & links so synthetic click events still fire (end-screen buttons, scroll btn).
+// touchstart: buttons/links/scroll-zone 예외 → click 이벤트가 정상 발화되도록
+// touchmove: 예외 없이 모두 차단 → scroll-zone 위에서 드래그해도 스크롤 안 됨
+//   (click은 touchstart+touchend 쌍에서 발화되므로 touchmove 차단은 클릭에 영향 없음)
 if(isMobile){
   document.addEventListener('touchstart', e=>{
     if(e.target.closest('button,a,[role="button"],.scroll-zone')) return;
     e.preventDefault();
   }, {passive:false});
   document.addEventListener('touchmove', e=>{
-    if(e.target.closest('button,a,[role="button"],.scroll-zone')) return;
-    e.preventDefault();
+    e.preventDefault(); // 예외 없음 — 드래그 스크롤 완전 차단
   }, {passive:false});
 }
 
