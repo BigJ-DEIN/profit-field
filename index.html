@@ -934,7 +934,7 @@ function showEndScreen(){
   const isWin=gameOverType==='win';
   overlay.style.cssText=`
     position:fixed;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
+    align-items:center;justify-content:space-between;
     background:rgba(255,255,255,0.88);
     font-family:"Courier New",monospace;
     z-index:9999;backdrop-filter:blur(6px);
@@ -945,66 +945,78 @@ function showEndScreen(){
 
   const mob=isMobile;
   overlay.innerHTML=`
-    <div style="text-align:center;width:100%;max-width:420px;padding:0 ${mob?'20px':'24px'}">
-      <div style="font-size:${mob?'12':'11'}px;letter-spacing:0.18em;color:#999;margin-bottom:${mob?'20':'28'}px;text-transform:uppercase">
+    <!-- TOP BLOCK: 상단 40vh — 결과 레이블 + 타이틀 + 설명 + 스탯 -->
+    <div style="height:40vh;width:100%;max-width:420px;padding:0 ${mob?'20px':'24px'};
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+      padding-bottom:${mob?'16px':'20px'};box-sizing:border-box;">
+      <div style="font-size:${mob?'12':'11'}px;letter-spacing:0.18em;color:#999;margin-bottom:${mob?'12':'16'}px;text-transform:uppercase">
         ${isWin ? 'profit +10 achieved' : 'profit −10 reached'}
       </div>
-      <div style="font-size:clamp(${mob?'36px':'28px'},${mob?'12':'6'}vw,${mob?'60':'52'}px);font-weight:700;letter-spacing:-0.02em;
-        color:${isWin?'rgba(190,30,30,0.85)':'rgba(20,20,20,0.85)'};margin-bottom:12px;line-height:1.1">
+      <div style="font-size:clamp(${mob?'32px':'26px'},${mob?'11':'6'}vw,${mob?'54':'48'}px);font-weight:700;letter-spacing:-0.02em;
+        color:${isWin?'rgba(190,30,30,0.85)':'rgba(20,20,20,0.85)'};margin-bottom:10px;line-height:1.1">
         ${isWin ? '+PROFIT' : '−PROFIT'}
       </div>
-      <div style="font-size:${mob?'15':'13'}px;color:#666;margin-bottom:${mob?'20':'16'}px;line-height:1.8">
+      <div style="font-size:${mob?'14':'13'}px;color:#666;margin-bottom:${mob?'14':'12'}px;line-height:1.8;text-align:center">
         ${isWin
           ? 'All signals captured.<br>Maximum profit unlocked.'
           : 'Too many signals missed.<br>Position closed at a loss.'}
       </div>
-      <div style="margin-bottom:${mob?'20':'28'}px;padding:${mob?'14px 24px':'12px 20px'};border:1px solid #eee;display:inline-block">
-        <div style="font-size:${mob?'11':'9'}px;color:#ccc;letter-spacing:0.06em">
+      <div style="padding:${mob?'10px 20px':'10px 20px'};border:1px solid #eee;display:inline-block">
+        <div style="font-size:${mob?'10':'9'}px;color:#ccc;letter-spacing:0.06em">
           ${statCatches}C · ${statMisses}M · ×${statMaxCombo} MAX · ${Math.round(precision*100)}% precision
           ${statRhythm>0?' · '+statRhythm+' rhythm':''}
         </div>
       </div>
+    </div>
+
+    <!-- MIDDLE GAP: 20vh 공백 — Framer 중앙 메시지 영역 -->
+    <div style="height:20vh;flex-shrink:0;"></div>
+
+    <!-- BOTTOM BLOCK: 하단 40vh — 글로벌 기록 + 버튼 -->
+    <div style="height:40vh;width:100%;max-width:420px;padding:0 ${mob?'20px':'24px'};
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+      padding-top:${mob?'16px':'20px'};box-sizing:border-box;">
       <div style="border-top:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;
-        padding:${mob?'24px':'20px'} 0;margin-bottom:${mob?'28':'32'}px">
-        <div style="font-size:${mob?'11':'10'}px;letter-spacing:0.14em;color:#aaa;margin-bottom:14px;text-transform:uppercase">
+        padding:${mob?'16px':'16px'} 0;margin-bottom:${mob?'18':'20'}px;width:100%;text-align:center">
+        <div style="font-size:${mob?'10':'10'}px;letter-spacing:0.14em;color:#aaa;margin-bottom:12px;text-transform:uppercase">
           global record
         </div>
         <div style="display:flex;gap:${mob?'48':'40'}px;justify-content:center;align-items:flex-end">
           <div style="text-align:center">
-            <div style="font-size:clamp(${mob?'28':'22'}px,5vw,38px);font-weight:700;color:rgba(190,30,30,0.80)">${winCount.toLocaleString()}</div>
-            <div style="font-size:${mob?'11':'10'}px;color:#aaa;letter-spacing:0.1em;margin-top:4px">PROFIT+</div>
+            <div style="font-size:clamp(${mob?'24':'20'}px,5vw,34px);font-weight:700;color:rgba(190,30,30,0.80)">${winCount.toLocaleString()}</div>
+            <div style="font-size:${mob?'10':'10'}px;color:#aaa;letter-spacing:0.1em;margin-top:4px">PROFIT+</div>
           </div>
           <div style="text-align:center;padding-bottom:4px">
-            <div style="font-size:${mob?'15':'13'}px;color:#ccc">/</div>
+            <div style="font-size:${mob?'14':'13'}px;color:#ccc">/</div>
           </div>
           <div style="text-align:center">
-            <div style="font-size:clamp(${mob?'28':'22'}px,5vw,38px);font-weight:700;color:rgba(20,20,20,0.55)">${loseCount.toLocaleString()}</div>
-            <div style="font-size:${mob?'11':'10'}px;color:#aaa;letter-spacing:0.1em;margin-top:4px">PROFIT−</div>
+            <div style="font-size:clamp(${mob?'24':'20'}px,5vw,34px);font-weight:700;color:rgba(20,20,20,0.55)">${loseCount.toLocaleString()}</div>
+            <div style="font-size:${mob?'10':'10'}px;color:#aaa;letter-spacing:0.1em;margin-top:4px">PROFIT−</div>
           </div>
         </div>
-        <div style="margin-top:14px;font-size:${mob?'11':'10'}px;color:#bbb">
+        <div style="margin-top:12px;font-size:${mob?'10':'10'}px;color:#bbb">
           ${winPct}% of players reached max profit
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:${mob?'14':'10'}px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:${mob?'12':'10'}px;width:100%">
         <button id="restart-btn" style="
           background:none;border:1px solid #ccc;
-          padding:${mob?'14px 0':'10px 32px'};font-family:'Courier New',monospace;
-          font-size:${mob?'13':'11'}px;letter-spacing:0.14em;color:#666;
+          padding:${mob?'12px 0':'10px 32px'};font-family:'Courier New',monospace;
+          font-size:${mob?'12':'11'}px;letter-spacing:0.14em;color:#666;
           cursor:pointer;text-transform:uppercase;width:${mob?'240px':'180px'};
           transition:border-color 0.2s,color 0.2s;-webkit-tap-highlight-color:transparent">
           play again <span id="restart-countdown" style="color:#bbb">(30)</span>
         </button>
         <button id="share-btn" style="
           background:none;border:1px solid #e8e8e8;
-          padding:${mob?'14px 0':'10px 32px'};font-family:'Courier New',monospace;
-          font-size:${mob?'13':'11'}px;letter-spacing:0.14em;color:#bbb;
+          padding:${mob?'12px 0':'10px 32px'};font-family:'Courier New',monospace;
+          font-size:${mob?'12':'11'}px;letter-spacing:0.14em;color:#bbb;
           cursor:pointer;text-transform:uppercase;width:${mob?'240px':'180px'};
           transition:border-color 0.2s,color 0.2s;-webkit-tap-highlight-color:transparent">
           share
         </button>
         <div id="share-toast" style="
-          font-size:${mob?'12':'10'}px;letter-spacing:0.1em;color:#aaa;
+          font-size:${mob?'11':'10'}px;letter-spacing:0.1em;color:#aaa;
           height:16px;text-align:center;transition:opacity 0.3s;opacity:0">
           link copied
         </div>
