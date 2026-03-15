@@ -223,18 +223,37 @@ window.addEventListener('mousemove', e=>{ handleMove(e.clientX, e.clientY); });
 // ── Touch support — attached to document so iOS Safari always fires ───────
 // (Canvas-level listeners can silently fail on iOS; document-level is bulletproof)
 
-// Prevent default touch behavior (scroll / zoom / rubber-band) — mobile only.
-// touchstart: buttons/links/scroll-zone 예외 → click 이벤트가 정상 발화되도록
-// touchmove: 예외 없이 모두 차단 → scroll-zone 위에서 드래그해도 스크롤 안 됨
-//   (click은 touchstart+touchend 쌍에서 발화되므로 touchmove 차단은 클릭에 영향 없음)
+// ── 모바일 스크롤 완전 차단 ───────────────────────────────────────────────
+// touchstart: 예외 없이 항상 preventDefault() → 브라우저가 scroll 제스처를
+//   commit하기 전에 첫 터치부터 차단. 버튼/scroll-zone 클릭은 touchend에서 수동 발화.
+// touchmove: 마찬가지로 예외 없이 차단.
 if(isMobile){
+  const _tap=new Map(); // identifier → {el, x, y}
+
   document.addEventListener('touchstart', e=>{
-    if(e.target.closest('button,a,[role="button"],.scroll-zone')) return;
-    e.preventDefault();
-  }, {passive:false});
+    e.preventDefault(); // 무조건 스크롤 차단 — 예외 없음
+    Array.from(e.changedTouches).forEach(t=>{
+      const tappable=e.target.closest('button,a,[role="button"],.scroll-zone');
+      if(tappable) _tap.set(t.identifier,{el:tappable,x:t.clientX,y:t.clientY});
+    });
+  },{passive:false});
+
+  document.addEventListener('touchend', e=>{
+    Array.from(e.changedTouches).forEach(t=>{
+      const info=_tap.get(t.identifier);
+      if(info){
+        _tap.delete(t.identifier);
+        // 손가락이 12px 이내로 이동 = tap → click 수동 발화
+        if(Math.abs(t.clientX-info.x)<12 && Math.abs(t.clientY-info.y)<12){
+          info.el.click();
+        }
+      }
+    });
+  },{passive:false});
+
   document.addEventListener('touchmove', e=>{
-    e.preventDefault(); // 예외 없음 — 드래그 스크롤 완전 차단
-  }, {passive:false});
+    e.preventDefault(); // 드래그 스크롤 완전 차단
+  },{passive:false});
 }
 
 // 데스크탑: wheel 리스너는 passive만 등록 (preventDefault 없음).
